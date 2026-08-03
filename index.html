@@ -17,6 +17,37 @@
   
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Clean, crisp outline text styles avoiding WebkitTextStroke fill bugs */
+    .rank-number-text {
+      font-style: italic;
+      text-shadow: 
+        2px 2px 0 #000,
+        -2px -2px 0 #000,
+        2px -2px 0 #000,
+        -2px 2px 0 #000,
+        0px 2px 0 #000,
+        2px 0px 0 #000,
+        0px -2px 0 #000,
+        -2px 0px 0 #000,
+        3px 3px 4px rgba(0,0,0,0.8);
+    }
+
+    .clip-title-text {
+      color: #ffffff;
+      text-shadow: 
+        2px 2px 0 #000,
+        -2px -2px 0 #000,
+        2px -2px 0 #000,
+        -2px 2px 0 #000,
+        0px 2px 0 #000,
+        2px 0px 0 #000,
+        0px -2px 0 #000,
+        -2px 0px 0 #000,
+        2px 3px 4px rgba(0,0,0,0.9);
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
 
@@ -211,7 +242,7 @@
           <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex justify-between items-center sticky top-0 z-50">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/20">
-                <i data-lucide="film" class="w-6 h-6 text-white"></i>
+                <i data-lucide="film" className="w-6 h-6 text-white"></i>
               </div>
               <h1 className="font-extrabold text-xl tracking-wider text-white">
                 Luced AI
@@ -225,7 +256,7 @@
                   activeTab === 'editor' ? 'bg-emerald-500 text-slate-950 font-semibold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                <i data-lucide="sparkles" class="w-4 h-4"></i> Studio
+                <i data-lucide="sparkles" className="w-4 h-4"></i> Studio
               </button>
               <button 
                 onClick={() => setActiveTab('architecture')}
@@ -233,7 +264,7 @@
                   activeTab === 'architecture' ? 'bg-emerald-500 text-slate-950 font-semibold' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
-                <i data-lucide="layers" class="w-4 h-4"></i> Docs
+                <i data-lucide="layers" className="w-4 h-4"></i> Docs
               </button>
             </div>
           </header>
@@ -249,7 +280,7 @@
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider">
-                      <i data-lucide="type" class="w-5 h-5"></i> Title
+                      <i data-lucide="type" className="w-5 h-5"></i> Title
                     </div>
                   </div>
                   
@@ -308,7 +339,7 @@
                 {/* BOX 2: CLIP */}
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                   <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider border-b border-slate-800 pb-2">
-                    <i data-lucide="video" class="w-5 h-5"></i> Clip
+                    <i data-lucide="video" className="w-5 h-5"></i> Clip
                   </div>
 
                   <div className="space-y-3">
@@ -350,17 +381,17 @@
                               onClick={() => processClip(clip.id)}
                               className="px-2.5 py-1 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-800/50 rounded text-xs flex items-center gap-1"
                             >
-                              <i data-lucide="refresh-cw" class="w-3 h-3"></i> Fetch Video
+                              <i data-lucide="refresh-cw" className="w-3 h-3"></i> Fetch Video
                             </button>
                           )}
                           {clip.status === 'processing' && (
                             <span className="px-2.5 py-1 bg-amber-950 text-amber-400 text-xs rounded flex items-center gap-1 animate-pulse">
-                              <i data-lucide="refresh-cw" class="w-3 h-3 animate-spin"></i> Fetching...
+                              <i data-lucide="refresh-cw" className="w-3 h-3 animate-spin"></i> Fetching...
                             </span>
                           )}
                           {clip.status === 'processed' && (
                             <span className="px-2 py-1 bg-emerald-950/60 text-emerald-400 text-[11px] font-medium border border-emerald-800/30 rounded flex items-center gap-1">
-                              <i data-lucide="check-circle-2" class="w-3 h-3"></i> Ready
+                              <i data-lucide="check-circle-2" className="w-3 h-3"></i> Ready
                             </span>
                           )}
                         </div>
@@ -373,14 +404,14 @@
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider">
-                      <i data-lucide="shuffle" class="w-5 h-5"></i> Order
+                      <i data-lucide="shuffle" className="w-5 h-5"></i> Order
                     </div>
 
                     <button 
                       onClick={shufflePlaybackOrder}
                       className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow transition"
                     >
-                      <i data-lucide="shuffle" class="w-3.5 h-3.5"></i> Auto-Shuffle Order
+                      <i data-lucide="shuffle" className="w-3.5 h-3.5"></i> Auto-Shuffle Order
                     </button>
                   </div>
 
@@ -419,7 +450,7 @@
                           </div>
 
                           <div className="flex items-center gap-1 text-slate-500 hover:text-slate-300">
-                            <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                            <i data-lucide="grip-vertical" className="w-4 h-4"></i>
                           </div>
                         </div>
                       );
@@ -429,7 +460,7 @@
               </div>
 
               {/* RIGHT PANEL: Live Mobile Preview Player (5 Cols) */}
-              <div className="lg:col-span-5 flex flex-col items-center justify-start space-y-4">
+              <div className="lg:col-span-5 flex flex-col items-center justify-start space-y-4 sticky top-24 self-start">
                 <div className="text-center">
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/60 border border-emerald-800/40 px-3 py-1 rounded-full">
                     Live Preview
@@ -455,7 +486,7 @@
                       />
                     ) : (
                       <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-600 text-xs p-4 text-center">
-                        <i data-lucide="video" class="w-8 h-8 mb-2 opacity-40"></i>
+                        <i data-lucide="video" className="w-8 h-8 mb-2 opacity-40"></i>
                         <span>Paste clip link in Box 2 to view video preview</span>
                       </div>
                     )}
@@ -484,25 +515,15 @@
                         return (
                           <div key={rankNum} className="flex items-center gap-3 h-9">
                             <span 
-                              style={{ 
-                                color: rankColors[rankNum], 
-                                WebkitTextStroke: '2px black', 
-                                textShadow: '3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
-                              }} 
-                              className="text-4xl font-black italic tracking-tighter"
+                              style={{ color: rankColors[rankNum] }} 
+                              className="rank-number-text text-2xl font-black italic tracking-tighter"
                             >
                               {rankNum}.
                             </span>
                             
                             {/* Only show clip name if active and provided */}
                             {isCurrent && item?.label && (
-                              <span 
-                                className="text-white font-black text-xl tracking-wide lowercase"
-                                style={{
-                                  WebkitTextStroke: '1px black',
-                                  textShadow: '2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000'
-                                }}
-                              >
+                              <span className="clip-title-text font-black text-base tracking-wide lowercase">
                                 {item.label}
                               </span>
                             )}
@@ -526,7 +547,7 @@
                       onClick={togglePlay}
                       className="p-1.5 bg-emerald-500 text-slate-950 rounded-full hover:scale-105 transition"
                     >
-                      {isPlaying ? <i data-lucide="pause" class="w-4 h-4"></i> : <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>}
+                      {isPlaying ? <i data-lucide="pause" className="w-4 h-4"></i> : <i data-lucide="play" className="w-4 h-4 fill-slate-950"></i>}
                     </button>
                     <span className="text-[11px] font-mono text-slate-300">
                       {isPlaying ? 'Playing' : 'Paused'}
@@ -543,11 +564,11 @@
                   >
                     {isGenerating ? (
                       <>
-                        <i data-lucide="refresh-cw" class="w-5 h-5 animate-spin"></i> Rendering ({exportProgress}%)
+                        <i data-lucide="refresh-cw" className="w-5 h-5 animate-spin"></i> Rendering ({exportProgress}%)
                       </>
                     ) : (
                       <>
-                        <i data-lucide="download" class="w-5 h-5"></i> Export Video
+                        <i data-lucide="download" className="w-5 h-5"></i> Export Video
                       </>
                     )}
                   </button>
