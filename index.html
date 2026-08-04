@@ -82,6 +82,7 @@
       const [exportProgress, setExportProgress] = useState(0);
       const [activeTab, setActiveTab] = useState('editor');
       const [draggedIndex, setDraggedIndex] = useState(null);
+      const [showResetModal, setShowResetModal] = useState(false);
 
       const videoRef = useRef(null);
 
@@ -131,6 +132,23 @@
 
       const updateClip = (id, field, value) => {
         setClips(clips.map(c => c.id === id ? { ...c, [field]: value } : c));
+      };
+
+      // Reset / New Video action
+      const handleResetProject = () => {
+        setMainTitle("");
+        setWordColors({});
+        setClips([
+          { id: 'clip-1', rank: 1, label: '', url: '', status: 'idle' },
+          { id: 'clip-2', rank: 2, label: '', url: '', status: 'idle' },
+          { id: 'clip-3', rank: 3, label: '', url: '', status: 'idle' },
+          { id: 'clip-4', rank: 4, label: '', url: '', status: 'idle' },
+          { id: 'clip-5', rank: 5, label: '', url: '', status: 'idle' },
+        ]);
+        setPlaybackOrder(['clip-1', 'clip-2', 'clip-3', 'clip-4', 'clip-5']);
+        setCurrentOrderIndex(0);
+        setIsPlaying(false);
+        setShowResetModal(false);
       };
 
       // Drag and Drop Handlers with Live Reordering
@@ -196,7 +214,7 @@
 
       const renderFormattedTitle = (isInteractive = false) => {
         if (!mainTitle.trim()) {
-          return <span className="text-slate-600 italic">Enter title above...</span>;
+          return isInteractive ? <span className="text-slate-600 italic">Enter title above...</span> : null;
         }
 
         const lines = mainTitle.split('\n');
@@ -491,8 +509,8 @@
                       </div>
                     )}
 
-                    {/* OVERLAY 1: Sticky Top Black Box Main Title */}
-                    <div className="absolute top-0 left-0 w-full z-10 bg-black pt-5 pb-3 px-3 text-center border-b border-black">
+                    {/* OVERLAY 1: Sticky Top Black Box Main Title Container (Always Present) */}
+                    <div className="absolute top-0 left-0 w-full z-10 bg-black pt-5 pb-3 px-3 text-center border-b border-black min-h-[50px] flex items-center justify-center">
                       <h2 className="text-[26px] font-black tracking-tight text-white leading-tight uppercase">
                         {renderFormattedTitle(false)}
                       </h2>
@@ -555,12 +573,12 @@
                   </div>
                 </div>
 
-                {/* GENERATE ACTION BUTTON */}
-                <div className="w-[320px]">
+                {/* ACTION BUTTONS (Export & New Video) */}
+                <div className="w-[320px] space-y-2.5">
                   <button 
                     onClick={handleGenerateVideo}
                     disabled={isGenerating}
-                    className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-base rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-[0.98] disabled:opacity-50"
+                    className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-base rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/20 transition active:scale-[0.98] disabled:opacity-50"
                   >
                     {isGenerating ? (
                       <>
@@ -571,6 +589,39 @@
                         <i data-lucide="download" className="w-5 h-5"></i> Export Video
                       </>
                     )}
+                  </button>
+
+                  <button 
+                    onClick={() => setShowResetModal(true)}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
+                  >
+                    <i data-lucide="plus-circle" className="w-4 h-4 text-emerald-400"></i> New Video
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRMATION MODAL FOR NEW VIDEO */}
+          {showResetModal && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-3 text-amber-400">
+                  <i data-lucide="alert-triangle" className="w-6 h-6 flex-shrink-0"></i>
+                  <h3 className="font-bold text-white text-base">Start a New Video?</h3>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button 
+                    onClick={() => setShowResetModal(false)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleResetProject}
+                    className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition shadow-lg shadow-rose-950/50"
+                  >
+                    Yes, Clear All
                   </button>
                 </div>
               </div>
