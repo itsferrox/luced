@@ -47,6 +47,18 @@
         -2px 0px 0 #000,
         2px 3px 4px rgba(0,0,0,0.9);
     }
+
+    /* Range slider custom styling for video cutter */
+    input[type="range"]::-webkit-slider-thumb {
+      pointer-events: auto;
+      width: 16px;
+      height: 24px;
+      border-radius: 4px;
+      background: #10b981;
+      border: 2px solid #ffffff;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
@@ -62,16 +74,16 @@
       const [selectedColor, setSelectedColor] = useState("#5EE0B3");
       const [wordColors, setWordColors] = useState({});
 
-      // Clip Management State (5 Empty Fixed Slots)
-      const [clips, setClips] = useState([
-        { id: 'clip-1', rank: 1, label: '', url: '', status: 'idle' },
-        { id: 'clip-2', rank: 2, label: '', url: '', status: 'idle' },
-        { id: 'clip-3', rank: 3, label: '', url: '', status: 'idle' },
-        { id: 'clip-4', rank: 4, label: '', url: '', status: 'idle' },
-        { id: 'clip-5', rank: 5, label: '', url: '', status: 'idle' },
-      ]);
+      // Initial empty 5 slots
+      const createInitialClips = () => [
+        { id: 'clip-1', rank: 1, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-2', rank: 2, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-3', rank: 3, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-4', rank: 4, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-5', rank: 5, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+      ];
 
-      // Playback Order State (Array of clip IDs)
+      const [clips, setClips] = useState(createInitialClips());
       const [playbackOrder, setPlaybackOrder] = useState(['clip-1', 'clip-2', 'clip-3', 'clip-4', 'clip-5']);
 
       // Active Player & Preview State
@@ -81,7 +93,10 @@
       const [isGenerating, setIsGenerating] = useState(false);
       const [exportProgress, setExportProgress] = useState(0);
       const [draggedIndex, setDraggedIndex] = useState(null);
+
+      // Modal States for Safety Popups
       const [showResetModal, setShowResetModal] = useState(false);
+      const [confirmAction, setConfirmAction] = useState(null); // { type: 'clear'|'edit', clipId: string }
 
       const videoRef = useRef(null);
 
@@ -130,20 +145,114 @@
       };
 
       const updateClip = (id, field, value) => {
-        setClips(clips.map(c => c.id === id ? { ...c, [field]: value } : c));
+        setClips(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+      };
+
+      // File upload handler
+      const handleFileUpload = (id, event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const fileUrl = URL.createObjectURL(file);
+        
+        // Calculate video duration dynamically
+        const tempVideo = document.createElement('video');
+        tempVideo.src = fileUrl;
+        tempVideo.onloadedmetadata = () => {
+          const dur = Math.round(tempVideo.duration) || 15;
+          setClips(prev => prev.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                url: fileUrl,
+                source: file.name,
+                status: 'processed',
+                duration: dur,
+                startTime: 0,
+                endTime: dur,
+                isTrimmerOpen: true,
+                isCutSaved: false
+              };
+            }
+            return c;
+          }));
+        };
+      };
+
+      // Link process handler
+      const processClip = (id) => {
+        updateClip(id, 'status', 'processing');
+        setTimeout(() => {
+          setClips(prev => prev.map(c => {
+            if (c.id === id) {
+              return {
+                ...c,
+                status: 'processed',
+                duration: 20,
+                startTime: 0,
+                endTime: 20,
+                isTrimmerOpen: true,
+                isCutSaved: false
+              };
+            }
+            return c;
+          }));
+        }, 1200);
+      };
+
+      // Save trimmed length
+      const saveClipCut = (id) => {
+        setClips(prev => prev.map(c => c.id === id ? { ...c, isTrimmerOpen: false, isCutSaved: true } : c));
+      };
+
+      // Open modal before clearing clip
+      const requestClearClip = (id) => {
+        setConfirmAction({ type: 'clear', clipId: id });
+      };
+
+      // Open modal before editing cut
+      const requestEditCut = (id) => {
+        setConfirmAction({ type: 'edit', clipId: id });
+      };
+
+      // Confirm modal action
+      const handleConfirmAction = () => {
+        if (!confirmAction) return;
+
+        if (confirmAction.type === 'clear') {
+          setClips(prev => prev.map(c => {
+            if (c.id === confirmAction.clipId) {
+              return {
+                ...c,
+                url: '',
+                source: '',
+                status: 'idle',
+                duration: 15,
+                startTime: 0,
+                endTime: 15,
+                isTrimmerOpen: false,
+                isCutSaved: false
+              };
+            }
+            return c;
+          }));
+        } else if (confirmAction.type === 'edit') {
+          setClips(prev => prev.map(c => {
+            if (c.id === confirmAction.clipId) {
+              return { ...c, isTrimmerOpen: true, isCutSaved: false };
+            }
+            return c;
+          }));
+        }
+
+        setConfirmAction(null);
       };
 
       // Reset / New Video action
       const handleResetProject = () => {
         setMainTitle("");
         setWordColors({});
-        setClips([
-          { id: 'clip-1', rank: 1, label: '', url: '', status: 'idle' },
-          { id: 'clip-2', rank: 2, label: '', url: '', status: 'idle' },
-          { id: 'clip-3', rank: 3, label: '', url: '', status: 'idle' },
-          { id: 'clip-4', rank: 4, label: '', url: '', status: 'idle' },
-          { id: 'clip-5', rank: 5, label: '', url: '', status: 'idle' },
-        ]);
+        setClips(createInitialClips());
         setPlaybackOrder(['clip-1', 'clip-2', 'clip-3', 'clip-4', 'clip-5']);
         setCurrentOrderIndex(0);
         setIsPlaying(false);
@@ -187,13 +296,6 @@
           }
           return { ...prev, [globalWordIdx]: selectedColor };
         });
-      };
-
-      const processClip = (id) => {
-        updateClip(id, 'status', 'processing');
-        setTimeout(() => {
-          updateClip(id, 'status', 'processed');
-        }, 1500);
       };
 
       const handleGenerateVideo = () => {
@@ -267,7 +369,7 @@
             </div>
           </header>
 
-          {/* Studio View (Always Open) */}
+          {/* Studio View */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-[1800px] mx-auto w-full">
             
             {/* LEFT PANEL: Controls & Settings (7 Cols) */}
@@ -339,61 +441,182 @@
                   <i data-lucide="video" className="w-5 h-5"></i> Clip
                 </div>
 
-                <div className="space-y-3">
-                  {clips.map((clip) => (
-                    <div 
-                      key={clip.id}
-                      className={`p-3.5 rounded-xl border transition flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
-                        currentClipId === clip.id 
-                          ? 'bg-slate-800/80 border-emerald-500/50 shadow-lg shadow-emerald-950/30' 
-                          : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 w-full md:w-auto flex-1">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black flex items-center justify-center text-xs flex-shrink-0">
-                          #{clip.rank}
+                <div className="space-y-4">
+                  {clips.map((clip) => {
+                    const hasClip = Boolean(clip.url);
+                    const isCutSaved = clip.isCutSaved && !clip.isTrimmerOpen;
+
+                    return (
+                      <div key={clip.id} className="space-y-0">
+                        {/* MAIN CLIP CARD */}
+                        <div 
+                          className={`p-3.5 rounded-xl border transition flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
+                            clip.isTrimmerOpen 
+                              ? 'rounded-b-none border-b-0 border-emerald-500 bg-slate-800/90'
+                              : currentClipId === clip.id 
+                                ? 'bg-slate-800/80 border-emerald-500/50 shadow-lg shadow-emerald-950/30' 
+                                : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-black flex items-center justify-center text-xs flex-shrink-0">
+                              #{clip.rank}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
+                              {/* Clip Name Input (Always Visible) */}
+                              <input 
+                                type="text"
+                                value={clip.label}
+                                onChange={(e) => updateClip(clip.id, 'label', e.target.value)}
+                                placeholder="Clip Name / Title"
+                                className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder:text-slate-600"
+                              />
+
+                              {/* CONDITIONAL INPUTS: If clip is in and cut saved, show length instead of upload/link inputs */}
+                              {hasClip && isCutSaved ? (
+                                <div className="bg-emerald-950/40 border border-emerald-800/50 rounded px-3 py-1.5 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                                  <i data-lucide="scissors" className="w-3.5 h-3.5"></i>
+                                  <span>Length: {clip.startTime}s - {clip.endTime}s ({clip.endTime - clip.startTime}s total)</span>
+                                </div>
+                              ) : !hasClip ? (
+                                <div className="flex items-center gap-2">
+                                  <input 
+                                    type="text"
+                                    value={clip.url}
+                                    onChange={(e) => updateClip(clip.id, 'url', e.target.value)}
+                                    placeholder="Paste Video Link"
+                                    className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 placeholder:text-slate-600 flex-1"
+                                  />
+
+                                  {/* File Upload Option */}
+                                  <label className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded cursor-pointer border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                                    <i data-lucide="upload" className="w-3.5 h-3.5 text-emerald-400"></i> Upload
+                                    <input 
+                                      type="file" 
+                                      accept="video/*" 
+                                      onChange={(e) => handleFileUpload(clip.id, e)} 
+                                      className="hidden" 
+                                    />
+                                  </label>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* ACTION BUTTONS (Right side of card) */}
+                          <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-0 border-slate-800 pt-2 md:pt-0">
+                            {/* Fetch button for link */}
+                            {clip.url && clip.status === 'idle' && (
+                              <button 
+                                onClick={() => processClip(clip.id)}
+                                className="px-2.5 py-1 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-800/50 rounded text-xs flex items-center gap-1 font-semibold"
+                              >
+                                <i data-lucide="refresh-cw" className="w-3 h-3"></i> Fetch
+                              </button>
+                            )}
+
+                            {clip.status === 'processing' && (
+                              <span className="px-2.5 py-1 bg-amber-950 text-amber-400 text-xs rounded flex items-center gap-1 animate-pulse">
+                                <i data-lucide="refresh-cw" className="w-3 h-3 animate-spin"></i> Fetching...
+                              </span>
+                            )}
+
+                            {/* Options when clip is loaded and cut is saved */}
+                            {hasClip && isCutSaved && (
+                              <>
+                                <button 
+                                  onClick={() => requestEditCut(clip.id)}
+                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs flex items-center gap-1 font-semibold transition"
+                                >
+                                  <i data-lucide="scissors" className="w-3 h-3 text-emerald-400"></i> Edit Cut
+                                </button>
+                                <button 
+                                  onClick={() => requestClearClip(clip.id)}
+                                  className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded text-xs flex items-center gap-1 font-semibold transition"
+                                >
+                                  <i data-lucide="trash-2" className="w-3 h-3"></i> Clear Box
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
-                          <input 
-                            type="text"
-                            value={clip.label}
-                            onChange={(e) => updateClip(clip.id, 'label', e.target.value)}
-                            placeholder="Clip Name / Title"
-                            className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder:text-slate-600"
-                          />
-                          <input 
-                            type="text"
-                            value={clip.url}
-                            onChange={(e) => updateClip(clip.id, 'url', e.target.value)}
-                            placeholder="Paste Video Link (YouTube/Instagram/TikTok)"
-                            className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 placeholder:text-slate-600"
-                          />
-                        </div>
-                      </div>
+                        {/* ATTACHED CONNECTED CUTTER / TRIMMER BOX */}
+                        {hasClip && clip.isTrimmerOpen && (
+                          <div className="bg-slate-900 border border-emerald-500 border-t-0 rounded-b-xl p-4 space-y-3 shadow-inner">
+                            <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                              <span className="flex items-center gap-1 text-emerald-400">
+                                <i data-lucide="scissors" className="w-3.5 h-3.5"></i> Trim Video Clip Length
+                              </span>
+                              <span>Total Clip: {clip.duration}s</span>
+                            </div>
 
-                      <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-0 border-slate-800 pt-2 md:pt-0">
-                        {clip.url && clip.status === 'idle' && (
-                          <button 
-                            onClick={() => processClip(clip.id)}
-                            className="px-2.5 py-1 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-800/50 rounded text-xs flex items-center gap-1"
-                          >
-                            <i data-lucide="refresh-cw" className="w-3 h-3"></i> Fetch Video
-                          </button>
-                        )}
-                        {clip.status === 'processing' && (
-                          <span className="px-2.5 py-1 bg-amber-950 text-amber-400 text-xs rounded flex items-center gap-1 animate-pulse">
-                            <i data-lucide="refresh-cw" className="w-3 h-3 animate-spin"></i> Fetching...
-                          </span>
-                        )}
-                        {clip.status === 'processed' && (
-                          <span className="px-2 py-1 bg-emerald-950/60 text-emerald-400 text-[11px] font-medium border border-emerald-800/30 rounded flex items-center gap-1">
-                            <i data-lucide="check-circle-2" className="w-3 h-3"></i> Ready
-                          </span>
+                            {/* Dual Range Trimmer Bar */}
+                            <div className="space-y-2">
+                              <div className="relative w-full h-8 bg-slate-950 rounded-lg border border-slate-800 flex items-center px-2 overflow-hidden">
+                                {/* Outside unselected region left */}
+                                <div 
+                                  style={{ width: `${(clip.startTime / clip.duration) * 100}%` }} 
+                                  className="absolute left-0 top-0 bottom-0 bg-slate-950/80 backdrop-blur"
+                                />
+
+                                {/* Selected Active Green Region */}
+                                <div 
+                                  style={{ 
+                                    left: `${(clip.startTime / clip.duration) * 100}%`,
+                                    width: `${((clip.endTime - clip.startTime) / clip.duration) * 100}%`
+                                  }} 
+                                  className="absolute top-0 bottom-0 bg-emerald-500/20 border-l-4 border-r-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                                />
+
+                                {/* Outside unselected region right */}
+                                <div 
+                                  style={{ width: `${100 - (clip.endTime / clip.duration) * 100}%` }} 
+                                  className="absolute right-0 top-0 bottom-0 bg-slate-950/80 backdrop-blur"
+                                />
+
+                                {/* Slider Handles */}
+                                <input 
+                                  type="range" 
+                                  min="0" 
+                                  max={clip.endTime - 1} 
+                                  value={clip.startTime} 
+                                  onChange={(e) => updateClip(clip.id, 'startTime', Math.min(Number(e.target.value), clip.endTime - 1))}
+                                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-20 pointer-events-none"
+                                />
+                                <input 
+                                  type="range" 
+                                  min={clip.startTime + 1} 
+                                  max={clip.duration} 
+                                  value={clip.endTime} 
+                                  onChange={(e) => updateClip(clip.id, 'endTime', Math.max(Number(e.target.value), clip.startTime + 1))}
+                                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-20 pointer-events-none"
+                                />
+                              </div>
+
+                              {/* Handles Second Indicators */}
+                              <div className="flex justify-between items-center text-[11px] font-mono font-bold text-slate-400 px-1">
+                                <span>Start: <strong className="text-emerald-400">{clip.startTime}s</strong></span>
+                                <span className="text-slate-500">Selected: {clip.endTime - clip.startTime}s</span>
+                                <span>End: <strong className="text-emerald-400">{clip.endTime}s</strong></span>
+                              </div>
+                            </div>
+
+                            {/* Keep / Save Length Button */}
+                            <div className="flex justify-end pt-1">
+                              <button 
+                                onClick={() => saveClipCut(clip.id)}
+                                className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-lg flex items-center gap-1.5 shadow transition"
+                              >
+                                <i data-lucide="check" className="w-3.5 h-3.5"></i> Keep This Length
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -484,7 +707,7 @@
                   ) : (
                     <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-600 text-xs p-4 text-center">
                       <i data-lucide="video" className="w-8 h-8 mb-2 opacity-40"></i>
-                      <span>Paste clip link in Box 2 to view video preview</span>
+                      <span>Paste link or upload clip in Box 2</span>
                     </div>
                   )}
 
@@ -600,6 +823,34 @@
                     className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition shadow-lg shadow-rose-950/50"
                   >
                     Yes, Clear All
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRMATION MODAL FOR CLIP EDIT / CLEAR ACTIONS */}
+          {confirmAction && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-3 text-amber-400">
+                  <i data-lucide="alert-triangle" className="w-6 h-6 flex-shrink-0"></i>
+                  <h3 className="font-bold text-white text-base">
+                    {confirmAction.type === 'clear' ? 'Clear Clip Slot?' : 'Edit Cut Length?'}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button 
+                    onClick={() => setConfirmAction(null)}
+                    className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleConfirmAction}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl transition shadow-lg shadow-emerald-950/50"
+                  >
+                    Confirm
                   </button>
                 </div>
               </div>
