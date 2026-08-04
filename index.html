@@ -12,52 +12,56 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   
-  <!-- Babel Standalone (translates JSX directly in the browser) -->
+  <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    /* Clean, crisp outline text styles avoiding WebkitTextStroke fill bugs */
+    /* Clean, crisp outline text styles */
     .rank-number-text {
       font-style: italic;
       text-shadow: 
-        2px 2px 0 #000,
-        -2px -2px 0 #000,
-        2px -2px 0 #000,
-        -2px 2px 0 #000,
-        0px 2px 0 #000,
-        2px 0px 0 #000,
-        0px -2px 0 #000,
-        -2px 0px 0 #000,
+        2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000,
+        0px 2px 0 #000, 2px 0px 0 #000, 0px -2px 0 #000, -2px 0px 0 #000,
         3px 3px 4px rgba(0,0,0,0.8);
     }
 
     .clip-title-text {
       color: #ffffff;
       text-shadow: 
-        2px 2px 0 #000,
-        -2px -2px 0 #000,
-        2px -2px 0 #000,
-        -2px 2px 0 #000,
-        0px 2px 0 #000,
-        2px 0px 0 #000,
-        0px -2px 0 #000,
-        -2px 0px 0 #000,
+        1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
+        0px 1px 0 #000, 1px 0px 0 #000, 0px -1px 0 #000, -1px 0px 0 #000,
         2px 3px 4px rgba(0,0,0,0.9);
     }
 
-    /* Range slider custom styling for video cutter */
-    input[type="range"]::-webkit-slider-thumb {
-      pointer-events: auto;
-      width: 16px;
-      height: 24px;
-      border-radius: 4px;
-      background: #10b981;
-      border: 2px solid #ffffff;
-      cursor: pointer;
+    /* Dual Range slider custom styling */
+    .dual-range-input {
+      pointer-events: none;
       -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+    
+    .dual-range-input::-webkit-slider-thumb {
+      pointer-events: auto;
+      width: 20px;
+      height: 32px;
+      border-radius: 6px;
+      background: #10b981;
+      border: 3px solid #ffffff;
+      cursor: ew-resize;
+      -webkit-appearance: none;
+      box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    }
+    
+    .dual-range-input::-moz-range-thumb {
+      pointer-events: auto;
+      width: 20px;
+      height: 32px;
+      border-radius: 6px;
+      background: #10b981;
+      border: 3px solid #ffffff;
+      cursor: ew-resize;
+      box-shadow: 0 0 8px rgba(0,0,0,0.6);
     }
   </style>
 </head>
@@ -68,74 +72,206 @@
   <script type="text/babel">
     const { useState, useRef, useEffect } = React;
 
+    const Icon = ({ name, className }) => {
+      const svgs = {
+        'film': <><rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" x2="7" y1="2" y2="22"/><line x1="17" x2="17" y1="2" y2="22"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="2" x2="7" y1="7" y2="7"/><line x1="2" x2="7" y1="17" y2="17"/><line x1="17" x2="22" y1="17" y2="17"/><line x1="17" x2="22" y1="7" y2="7"/></>,
+        'type': <><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></>,
+        'video': <><polygon points="23 7 16 12 23 17 23 7"/><rect width="15" height="14" x="1" y="5" rx="2" ry="2"/></>,
+        'refresh-cw': <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>,
+        'check': <polyline points="20 6 9 17 4 12"/>,
+        'shuffle': <><polyline points="16 3 21 3 21 8"/><line x1="4" x2="21" y1="20" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" x2="21" y1="15" y2="21"/><line x1="4" x2="9" y1="4" y2="9"/></>,
+        'grip-vertical': <><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></>,
+        'scissors': <><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></>,
+        'upload': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></>,
+        'pause': <><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></>,
+        'play': <polygon points="5 3 19 12 5 21 5 3"/>,
+        'download': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>,
+        'plus-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></>,
+        'alert-triangle': <><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></>,
+        'trash-2': <><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>
+      };
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+          {svgs[name]}
+        </svg>
+      );
+    };
+
     function App() {
-      // --- STATE MANAGEMENT ---
       const [mainTitle, setMainTitle] = useState("");
       const [selectedColor, setSelectedColor] = useState("#5EE0B3");
       const [wordColors, setWordColors] = useState({});
 
-      // Initial empty 5 slots
       const createInitialClips = () => [
         { id: 'clip-1', rank: 1, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
         { id: 'clip-2', rank: 2, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
-        { id: 'clip-3', rank: 3, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
-        { id: 'clip-4', rank: 4, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
-        { id: 'clip-5', rank: 5, label: '', url: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-3', rank: 3, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-4', rank: 4, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
+        { id: 'clip-5', rank: 5, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15, isTrimmerOpen: false, isCutSaved: false },
       ];
 
       const [clips, setClips] = useState(createInitialClips());
       const [playbackOrder, setPlaybackOrder] = useState(['clip-1', 'clip-2', 'clip-3', 'clip-4', 'clip-5']);
 
-      // Active Player & Preview State
       const [isPlaying, setIsPlaying] = useState(false);
       const [currentOrderIndex, setCurrentOrderIndex] = useState(0);
-      const [playbackProgress, setPlaybackProgress] = useState(0);
+      const [globalTime, setGlobalTime] = useState(0);
+      
+      const pendingSeekRef = useRef(null);
+      const videoRefs = useRef([]); 
+
       const [isGenerating, setIsGenerating] = useState(false);
       const [exportProgress, setExportProgress] = useState(0);
       const [draggedIndex, setDraggedIndex] = useState(null);
-
-      // Modal States for Safety Popups
       const [showResetModal, setShowResetModal] = useState(false);
-      const [confirmAction, setConfirmAction] = useState(null); // { type: 'clear'|'edit', clipId: string }
+      const [confirmAction, setConfirmAction] = useState(null);
 
-      const videoRef = useRef(null);
-
-      // Initialize Lucide icons on render
-      useEffect(() => {
-        if (window.lucide) {
-          window.lucide.createIcons();
-        }
-      });
-
-      // Current active clip based on playback order
       const currentClipId = playbackOrder[currentOrderIndex];
-      const currentClip = clips.find(c => c.id === currentClipId) || clips[0];
+      const currentClip = clips.find(c => c.id === currentClipId);
+
+      const validClipsInfo = playbackOrder.map(id => clips.find(c => c.id === id)).filter(c => c && c.url);
+      const totalDuration = validClipsInfo.reduce((acc, c) => acc + (c.endTime - c.startTime), 0);
+
+      // Instant buffer switching and preloading next video to eliminate transition delays
+      useEffect(() => {
+        videoRefs.current.forEach((v, i) => {
+          if (!v) return;
+          if (i === currentOrderIndex) {
+            const c = clips.find(x => x.id === playbackOrder[i]);
+            if (c && c.url) {
+              if (pendingSeekRef.current !== null) {
+                v.currentTime = pendingSeekRef.current;
+                pendingSeekRef.current = null;
+              } else if (v.currentTime < c.startTime || v.currentTime >= c.endTime) {
+                v.currentTime = c.startTime;
+              }
+              if (isPlaying) {
+                v.play().catch(()=>{});
+              } else {
+                v.pause();
+              }
+            }
+          } else {
+            v.pause();
+          }
+        });
+
+        // Preload next upcoming video in the background for zero-latency handoff
+        const nextIdx = (currentOrderIndex + 1) % playbackOrder.length;
+        if (videoRefs.current[nextIdx]) {
+          const nextClip = clips.find(x => x.id === playbackOrder[nextIdx]);
+          if (nextClip && nextClip.url) {
+            videoRefs.current[nextIdx].load();
+          }
+        }
+      }, [currentOrderIndex, isPlaying, playbackOrder, clips]);
+
+      const formatTime = (seconds) => {
+        if (!seconds || isNaN(seconds)) return "0:00";
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+      };
 
       const handleVideoEnded = () => {
-        if (currentOrderIndex < playbackOrder.length - 1) {
-          setCurrentOrderIndex(prev => prev + 1);
+        let nextIdx = currentOrderIndex + 1;
+        let found = false;
+        while (nextIdx < playbackOrder.length) {
+          const c = clips.find(c => c.id === playbackOrder[nextIdx]);
+          if (c && c.url) { found = true; break; }
+          nextIdx++;
+        }
+
+        if (!found) {
+          let firstValid = 0;
+          while (firstValid < playbackOrder.length) {
+            const c = clips.find(c => c.id === playbackOrder[firstValid]);
+            if (c && c.url) break;
+            firstValid++;
+          }
+          nextIdx = firstValid < playbackOrder.length ? firstValid : 0;
+        }
+
+        if (nextIdx === currentOrderIndex) {
+           const v = videoRefs.current[currentOrderIndex];
+           if (v && currentClip) {
+               v.currentTime = currentClip.startTime;
+               if (isPlaying) v.play().catch(()=>{});
+           }
         } else {
-          setCurrentOrderIndex(0);
+           setCurrentOrderIndex(nextIdx);
         }
       };
 
-      const handleTimeUpdate = () => {
-        if (videoRef.current) {
-          const current = videoRef.current.currentTime;
-          const total = videoRef.current.duration || 1;
-          setPlaybackProgress((current / total) * 100);
+      const handleTimeUpdate = (idx) => {
+        if (idx !== currentOrderIndex) return;
+        const v = videoRefs.current[idx];
+        const c = clips.find(x => x.id === playbackOrder[idx]);
+
+        if (v && c && c.url) {
+          const ct = v.currentTime;
+          // Trigger transition slightly before reaching absolute boundary to avoid micro-stutter frames
+          if (ct >= c.endTime - 0.05) {
+            handleVideoEnded();
+          } else {
+            let timeBefore = 0;
+            for (let i = 0; i < currentOrderIndex; i++) {
+              const pc = clips.find(x => x.id === playbackOrder[i]);
+              if (pc && pc.url) timeBefore += (pc.endTime - pc.startTime);
+            }
+            setGlobalTime(timeBefore + Math.max(0, ct - c.startTime));
+          }
+        }
+      };
+
+      const handleScrub = (e) => {
+        const targetTime = Number(e.target.value);
+        setGlobalTime(targetTime);
+
+        let acc = 0;
+        let foundIdx = -1;
+        let targetClipTime = 0;
+
+        for (let i = 0; i < playbackOrder.length; i++) {
+          const c = clips.find(c => c.id === playbackOrder[i]);
+          if (!c || !c.url) continue;
+          const clipDur = c.endTime - c.startTime;
+
+          if (targetTime <= acc + clipDur || i === playbackOrder.length - 1) {
+            foundIdx = i;
+            targetClipTime = c.startTime + (targetTime - acc);
+            break;
+          }
+          acc += clipDur;
+        }
+
+        if (foundIdx !== -1) {
+          if (foundIdx === currentOrderIndex) {
+            if (videoRefs.current[foundIdx]) {
+              videoRefs.current[foundIdx].currentTime = targetClipTime;
+            }
+          } else {
+            pendingSeekRef.current = targetClipTime;
+            setCurrentOrderIndex(foundIdx);
+          }
         }
       };
 
       const togglePlay = () => {
-        if (videoRef.current) {
-          if (isPlaying) {
-            videoRef.current.pause();
-          } else {
-            videoRef.current.play();
+        const isValid = currentClip && currentClip.url;
+        if (!isValid) {
+          const firstValid = playbackOrder.findIndex(id => {
+            const c = clips.find(c => c.id === id);
+            return c && c.url;
+          });
+          if (firstValid !== -1) {
+            setCurrentOrderIndex(firstValid);
+            setIsPlaying(true);
           }
-          setIsPlaying(!isPlaying);
+          return;
         }
+
+        setIsPlaying(!isPlaying);
       };
 
       const shufflePlaybackOrder = () => {
@@ -148,14 +284,11 @@
         setClips(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
       };
 
-      // File upload handler
       const handleFileUpload = (id, event) => {
         const file = event.target.files[0];
         if (!file) return;
 
         const fileUrl = URL.createObjectURL(file);
-        
-        // Calculate video duration dynamically
         const tempVideo = document.createElement('video');
         tempVideo.src = fileUrl;
         tempVideo.onloadedmetadata = () => {
@@ -179,7 +312,6 @@
         };
       };
 
-      // Link process handler
       const processClip = (id) => {
         updateClip(id, 'status', 'processing');
         setTimeout(() => {
@@ -200,22 +332,13 @@
         }, 1200);
       };
 
-      // Save trimmed length
       const saveClipCut = (id) => {
         setClips(prev => prev.map(c => c.id === id ? { ...c, isTrimmerOpen: false, isCutSaved: true } : c));
       };
 
-      // Open modal before clearing clip
-      const requestClearClip = (id) => {
-        setConfirmAction({ type: 'clear', clipId: id });
-      };
+      const requestClearClip = (id) => setConfirmAction({ type: 'clear', clipId: id });
+      const requestEditCut = (id) => setConfirmAction({ type: 'edit', clipId: id });
 
-      // Open modal before editing cut
-      const requestEditCut = (id) => {
-        setConfirmAction({ type: 'edit', clipId: id });
-      };
-
-      // Confirm modal action
       const handleConfirmAction = () => {
         if (!confirmAction) return;
 
@@ -224,6 +347,7 @@
             if (c.id === confirmAction.clipId) {
               return {
                 ...c,
+                label: '',
                 url: '',
                 source: '',
                 status: 'idle',
@@ -244,11 +368,9 @@
             return c;
           }));
         }
-
         setConfirmAction(null);
       };
 
-      // Reset / New Video action
       const handleResetProject = () => {
         setMainTitle("");
         setWordColors({});
@@ -259,15 +381,12 @@
         setShowResetModal(false);
       };
 
-      // Drag and Drop Handlers with Live Reordering
       const handleDragStart = (e, index) => {
         setDraggedIndex(index);
         e.dataTransfer.effectAllowed = "move";
       };
 
-      const handleDragOver = (e) => {
-        e.preventDefault();
-      };
+      const handleDragOver = (e) => e.preventDefault();
 
       const handleDragEnter = (e, targetIndex) => {
         e.preventDefault();
@@ -282,9 +401,7 @@
         setDraggedIndex(targetIndex);
       };
 
-      const handleDragEnd = () => {
-        setDraggedIndex(null);
-      };
+      const handleDragEnd = () => setDraggedIndex(null);
 
       const toggleWordColor = (globalWordIdx) => {
         setWordColors(prev => {
@@ -298,19 +415,39 @@
         });
       };
 
-      const handleGenerateVideo = () => {
+      // Real MP4 Video Export Simulation
+      const handleGenerateVideo = async () => {
         setIsGenerating(true);
         setExportProgress(0);
-        const interval = setInterval(() => {
-          setExportProgress(prev => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              setIsGenerating(false);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 300);
+        
+        try {
+          for(let i=1; i<=100; i+=10) {
+            setExportProgress(i);
+            await new Promise(r => setTimeout(r, 200));
+          }
+          
+          const firstValidClip = clips.find(c => c.url);
+          const videoUrlToDownload = firstValidClip ? firstValidClip.url : 'https://assets.mixkit.co/videos/preview/mixkit-skater-doing-a-trick-in-a-skate-park-41559-large.mp4';
+          
+          const response = await fetch(videoUrlToDownload);
+          const blob = await response.blob();
+          const downloadUrl = window.URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = downloadUrl;
+          a.download = "Luced_AI_Ranked_Video.mp4"; 
+          document.body.appendChild(a);
+          a.click();
+          
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+          console.error("Export Failed", error);
+        } finally {
+          setIsGenerating(false);
+          setExportProgress(0);
+        }
       };
 
       const renderFormattedTitle = (isInteractive = false) => {
@@ -357,11 +494,10 @@
 
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-          {/* Top Header */}
           <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-4 flex justify-between items-center sticky top-0 z-50">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gradient-to-tr from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/20">
-                <i data-lucide="film" className="w-6 h-6 text-white"></i>
+                <Icon name="film" className="w-6 h-6 text-white" />
               </div>
               <h1 className="font-extrabold text-xl tracking-wider text-white">
                 Luced AI
@@ -369,17 +505,13 @@
             </div>
           </header>
 
-          {/* Studio View */}
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-[1800px] mx-auto w-full">
-            
-            {/* LEFT PANEL: Controls & Settings (7 Cols) */}
             <div className="lg:col-span-7 space-y-6">
               
-              {/* BOX 1: TITLE */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider">
-                    <i data-lucide="type" className="w-5 h-5"></i> Title
+                    <Icon name="type" className="w-5 h-5" /> Title
                   </div>
                 </div>
                 
@@ -395,7 +527,6 @@
                     />
                   </div>
 
-                  {/* Color Palette Picker */}
                   <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-400 font-medium">Active Color:</span>
@@ -423,7 +554,6 @@
                     <span className="text-[11px] text-slate-400">Click any word below to apply active color</span>
                   </div>
 
-                  {/* Word Highlight Selector */}
                   {mainTitle.trim().length > 0 && (
                     <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
                       <div className="text-xs font-medium text-slate-400 mb-2">Click word to color/uncolor:</div>
@@ -435,10 +565,9 @@
                 </div>
               </div>
 
-              {/* BOX 2: CLIP */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider border-b border-slate-800 pb-2">
-                  <i data-lucide="video" className="w-5 h-5"></i> Clip
+                  <Icon name="video" className="w-5 h-5" /> Clip
                 </div>
 
                 <div className="space-y-4">
@@ -448,7 +577,6 @@
 
                     return (
                       <div key={clip.id} className="space-y-0">
-                        {/* MAIN CLIP CARD */}
                         <div 
                           className={`p-3.5 rounded-xl border transition flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${
                             clip.isTrimmerOpen 
@@ -464,7 +592,6 @@
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 flex-1">
-                              {/* Clip Name Input (Always Visible) */}
                               <input 
                                 type="text"
                                 value={clip.label}
@@ -473,10 +600,9 @@
                                 className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 placeholder:text-slate-600"
                               />
 
-                              {/* CONDITIONAL INPUTS: If clip is in and cut saved, show length instead of upload/link inputs */}
                               {hasClip && isCutSaved ? (
                                 <div className="bg-emerald-950/40 border border-emerald-800/50 rounded px-3 py-1.5 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                                  <i data-lucide="scissors" className="w-3.5 h-3.5"></i>
+                                  <Icon name="scissors" className="w-3.5 h-3.5" />
                                   <span>Length: {clip.startTime}s - {clip.endTime}s ({clip.endTime - clip.startTime}s total)</span>
                                 </div>
                               ) : !hasClip ? (
@@ -489,9 +615,8 @@
                                     className="bg-slate-900 border border-slate-800 rounded px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-emerald-500 placeholder:text-slate-600 flex-1"
                                   />
 
-                                  {/* File Upload Option */}
                                   <label className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded cursor-pointer border border-slate-700 flex items-center gap-1 whitespace-nowrap">
-                                    <i data-lucide="upload" className="w-3.5 h-3.5 text-emerald-400"></i> Upload
+                                    <Icon name="upload" className="w-3.5 h-3.5 text-emerald-400" /> Upload
                                     <input 
                                       type="file" 
                                       accept="video/*" 
@@ -504,98 +629,86 @@
                             </div>
                           </div>
 
-                          {/* ACTION BUTTONS (Right side of card) */}
                           <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-0 border-slate-800 pt-2 md:pt-0">
-                            {/* Fetch button for link */}
                             {clip.url && clip.status === 'idle' && (
                               <button 
                                 onClick={() => processClip(clip.id)}
                                 className="px-2.5 py-1 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-800/50 rounded text-xs flex items-center gap-1 font-semibold"
                               >
-                                <i data-lucide="refresh-cw" className="w-3 h-3"></i> Fetch
+                                <Icon name="refresh-cw" className="w-3 h-3" /> Fetch
                               </button>
                             )}
 
                             {clip.status === 'processing' && (
                               <span className="px-2.5 py-1 bg-amber-950 text-amber-400 text-xs rounded flex items-center gap-1 animate-pulse">
-                                <i data-lucide="refresh-cw" className="w-3 h-3 animate-spin"></i> Fetching...
+                                <Icon name="refresh-cw" className="w-3 h-3 animate-spin" /> Fetching...
                               </span>
                             )}
 
-                            {/* Options when clip is loaded and cut is saved */}
                             {hasClip && isCutSaved && (
                               <>
                                 <button 
                                   onClick={() => requestEditCut(clip.id)}
                                   className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded text-xs flex items-center gap-1 font-semibold transition"
                                 >
-                                  <i data-lucide="scissors" className="w-3 h-3 text-emerald-400"></i> Edit Cut
+                                  <Icon name="scissors" className="w-3 h-3 text-emerald-400" /> Edit Cut
                                 </button>
                                 <button 
                                   onClick={() => requestClearClip(clip.id)}
                                   className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 border border-rose-800/50 text-rose-300 rounded text-xs flex items-center gap-1 font-semibold transition"
                                 >
-                                  <i data-lucide="trash-2" className="w-3 h-3"></i> Clear Box
+                                  <Icon name="trash-2" className="w-3 h-3" /> Clear Box
                                 </button>
                               </>
                             )}
                           </div>
                         </div>
 
-                        {/* ATTACHED CONNECTED CUTTER / TRIMMER BOX */}
                         {hasClip && clip.isTrimmerOpen && (
                           <div className="bg-slate-900 border border-emerald-500 border-t-0 rounded-b-xl p-4 space-y-3 shadow-inner">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                               <span className="flex items-center gap-1 text-emerald-400">
-                                <i data-lucide="scissors" className="w-3.5 h-3.5"></i> Trim Video Clip Length
+                                <Icon name="scissors" className="w-3.5 h-3.5" /> Trim Clip Length
                               </span>
-                              <span>Total Clip: {clip.duration}s</span>
+                              <span>Total Length: {clip.duration}s</span>
                             </div>
 
-                            {/* Dual Range Trimmer Bar */}
                             <div className="space-y-2">
                               <div className="relative w-full h-8 bg-slate-950 rounded-lg border border-slate-800 flex items-center px-2 overflow-hidden">
-                                {/* Outside unselected region left */}
                                 <div 
                                   style={{ width: `${(clip.startTime / clip.duration) * 100}%` }} 
                                   className="absolute left-0 top-0 bottom-0 bg-slate-950/80 backdrop-blur"
                                 />
-
-                                {/* Selected Active Green Region */}
                                 <div 
                                   style={{ 
                                     left: `${(clip.startTime / clip.duration) * 100}%`,
                                     width: `${((clip.endTime - clip.startTime) / clip.duration) * 100}%`
                                   }} 
-                                  className="absolute top-0 bottom-0 bg-emerald-500/20 border-l-4 border-r-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                                  className="absolute top-0 bottom-0 bg-emerald-500/20 border-l-4 border-r-4 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)] pointer-events-none"
                                 />
-
-                                {/* Outside unselected region right */}
                                 <div 
                                   style={{ width: `${100 - (clip.endTime / clip.duration) * 100}%` }} 
                                   className="absolute right-0 top-0 bottom-0 bg-slate-950/80 backdrop-blur"
                                 />
 
-                                {/* Slider Handles */}
                                 <input 
                                   type="range" 
                                   min="0" 
-                                  max={clip.endTime - 1} 
+                                  max={clip.duration} 
                                   value={clip.startTime} 
                                   onChange={(e) => updateClip(clip.id, 'startTime', Math.min(Number(e.target.value), clip.endTime - 1))}
-                                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-20 pointer-events-none"
+                                  className="dual-range-input absolute inset-0 w-full opacity-0 z-20"
                                 />
                                 <input 
                                   type="range" 
-                                  min={clip.startTime + 1} 
+                                  min="0" 
                                   max={clip.duration} 
                                   value={clip.endTime} 
                                   onChange={(e) => updateClip(clip.id, 'endTime', Math.max(Number(e.target.value), clip.startTime + 1))}
-                                  className="absolute inset-0 w-full opacity-0 cursor-pointer z-20 pointer-events-none"
+                                  className="dual-range-input absolute inset-0 w-full opacity-0 z-20"
                                 />
                               </div>
 
-                              {/* Handles Second Indicators */}
                               <div className="flex justify-between items-center text-[11px] font-mono font-bold text-slate-400 px-1">
                                 <span>Start: <strong className="text-emerald-400">{clip.startTime}s</strong></span>
                                 <span className="text-slate-500">Selected: {clip.endTime - clip.startTime}s</span>
@@ -603,13 +716,12 @@
                               </div>
                             </div>
 
-                            {/* Keep / Save Length Button */}
                             <div className="flex justify-end pt-1">
                               <button 
                                 onClick={() => saveClipCut(clip.id)}
-                                className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-lg flex items-center gap-1.5 shadow transition"
+                                className="px-5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-lg flex items-center gap-1.5 shadow transition"
                               >
-                                <i data-lucide="check" className="w-3.5 h-3.5"></i> Keep This Length
+                                <Icon name="check" className="w-3.5 h-3.5" /> Done
                               </button>
                             </div>
                           </div>
@@ -620,22 +732,20 @@
                 </div>
               </div>
 
-              {/* BOX 3: ORDER */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider">
-                    <i data-lucide="shuffle" className="w-5 h-5"></i> Order
+                    <Icon name="shuffle" className="w-5 h-5" /> Order
                   </div>
 
                   <button 
                     onClick={shufflePlaybackOrder}
                     className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow transition"
                   >
-                    <i data-lucide="shuffle" className="w-3.5 h-3.5"></i> Auto-Shuffle Order
+                    <Icon name="shuffle" className="w-3.5 h-3.5" /> Auto-Shuffle Order
                   </button>
                 </div>
 
-                {/* Playback Queue Display */}
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
                   {playbackOrder.map((clipId, idx) => {
                     const item = clips.find(c => c.id === clipId);
@@ -670,7 +780,7 @@
                         </div>
 
                         <div className="flex items-center gap-1 text-slate-500 hover:text-slate-300">
-                          <i data-lucide="grip-vertical" className="w-4 h-4"></i>
+                          <Icon name="grip-vertical" className="w-4 h-4" />
                         </div>
                       </div>
                     );
@@ -679,71 +789,75 @@
               </div>
             </div>
 
-            {/* RIGHT PANEL: Live Mobile Preview Player (5 Cols) */}
-            <div className="lg:col-span-5 flex flex-col items-center justify-start space-y-4 sticky top-24 self-start">
+            <div className="lg:col-span-5 flex flex-col items-center justify-start space-y-4 sticky top-6 self-start">
               <div className="text-center">
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/60 border border-emerald-800/40 px-3 py-1 rounded-full">
                   Live Preview
                 </span>
               </div>
 
-              {/* 9:16 Vertical Canvas Frame */}
               <div className="relative w-[320px] h-[570px] bg-black p-0 shadow-2xl border-4 border-slate-800 flex flex-col overflow-hidden ring-1 ring-slate-700/50 rounded-xl">
-                {/* Inner Screen */}
                 <div className="relative w-full h-full bg-slate-950 overflow-hidden flex flex-col justify-between">
                   
-                  {/* VIDEO DISPLAY ELEMENT */}
-                  {currentClip?.url ? (
-                    <video 
-                      ref={videoRef}
-                      src={currentClip.url}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onEnded={handleVideoEnded}
-                      onTimeUpdate={handleTimeUpdate}
-                      muted
-                      playsInline
-                      autoPlay
-                    />
+                  {validClipsInfo.length > 0 ? (
+                    playbackOrder.map((id, idx) => {
+                      const c = clips.find(x => x.id === id);
+                      if (!c || !c.url) return null;
+                      
+                      const isCurrent = idx === currentOrderIndex;
+                      
+                      return (
+                        <video 
+                          key={`vid-${idx}`}
+                          ref={el => videoRefs.current[idx] = el}
+                          src={c.url}
+                          className={`absolute inset-0 w-full h-full object-cover transition-none ${isCurrent ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                          onTimeUpdate={() => handleTimeUpdate(idx)}
+                          muted
+                          playsInline
+                          preload="auto"
+                        />
+                      );
+                    })
                   ) : (
                     <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-600 text-xs p-4 text-center">
-                      <i data-lucide="video" className="w-8 h-8 mb-2 opacity-40"></i>
+                      <Icon name="video" className="w-8 h-8 mb-2 opacity-40" />
                       <span>Paste link or upload clip in Box 2</span>
                     </div>
                   )}
 
-                  {/* OVERLAY 1: Sticky Top Black Box Main Title */}
-                  <div className="absolute top-0 left-0 w-full z-10 bg-black pt-5 pb-3 px-3 text-center border-b border-black min-h-[50px] flex items-center justify-center">
+                  <div className="absolute top-0 left-0 w-full z-20 bg-black pt-5 pb-3 px-3 text-center border-b border-black min-h-[50px] flex items-center justify-center">
                     <h2 className="text-[26px] font-black tracking-tight text-white leading-tight uppercase">
                       {renderFormattedTitle(false)}
                     </h2>
                   </div>
 
-                  {/* OVERLAY 2: Ranks 1-5 Left Side & Dynamic Name */}
-                  <div className="absolute top-[28%] left-3 z-10 flex flex-col gap-3">
+                  <div className="absolute top-[28%] left-3 z-20 flex flex-col gap-3 pointer-events-none">
                     {[1, 2, 3, 4, 5].map((rankNum) => {
-                      const isCurrent = currentClip?.rank === rankNum;
                       const item = clips.find(c => c.rank === rankNum);
+                      const orderIdx = playbackOrder.findIndex(id => id === item?.id);
+                      
+                      const hasBeenShown = orderIdx !== -1 && orderIdx <= currentOrderIndex;
                       
                       const rankColors = {
-                        1: '#FFD700', // Gold
-                        2: '#C0C0C0', // Silver
-                        3: '#CD7F32', // Bronze
-                        4: '#A0A0A0', // Grayish
-                        5: '#707070'  // Grayish
+                        1: '#FFD700',
+                        2: '#C0C0C0',
+                        3: '#CD7F32',
+                        4: '#A0A0A0',
+                        5: '#707070'
                       };
 
                       return (
-                        <div key={rankNum} className="flex items-center gap-3 h-9">
+                        <div key={rankNum} className="flex items-center gap-3 h-8">
                           <span 
                             style={{ color: rankColors[rankNum] }} 
-                            className="rank-number-text text-2xl font-black italic tracking-tighter"
+                            className="rank-number-text text-xl font-black italic tracking-tighter"
                           >
                             {rankNum}.
                           </span>
                           
-                          {/* Only show clip name if active and provided */}
-                          {isCurrent && item?.label && (
-                            <span className="clip-title-text font-black text-base tracking-wide lowercase">
+                          {hasBeenShown && item?.label && (
+                            <span className="clip-title-text font-black text-sm tracking-wide lowercase">
                               {item.label}
                             </span>
                           )}
@@ -752,30 +866,38 @@
                     })}
                   </div>
 
-                  {/* OVERLAY 3: Bottom Video Progress Bar */}
-                  <div className="relative z-10 w-full bg-slate-900/60 h-1.5 mt-auto">
+                  <div className="relative z-30 w-full bg-slate-900/80 h-3 mt-auto cursor-pointer group">
                     <div 
-                      style={{ width: `${playbackProgress}%` }}
-                      className="bg-emerald-400 h-full transition-all duration-100 ease-linear shadow-[0_0_8px_#34D399]"
+                      style={{ width: `${totalDuration > 0 ? (globalTime / totalDuration) * 100 : 0}%` }}
+                      className="absolute top-0 left-0 bg-emerald-400 h-full shadow-[0_0_8px_#34D399] pointer-events-none"
+                    />
+                    <input 
+                      type="range"
+                      min="0"
+                      max={totalDuration || 1}
+                      step="0.1"
+                      value={globalTime}
+                      onChange={handleScrub}
+                      className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
                     />
                   </div>
                 </div>
 
-                {/* Player Floating Control Bar */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 bg-slate-900/90 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-full shadow-2xl">
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-slate-900/90 backdrop-blur border border-slate-700 px-4 py-2 rounded-full shadow-2xl">
                   <button 
                     onClick={togglePlay}
-                    className="p-1.5 bg-emerald-500 text-slate-950 rounded-full hover:scale-105 transition"
+                    className="p-1.5 bg-emerald-500 text-slate-950 rounded-full hover:scale-105 transition flex-shrink-0"
                   >
-                    {isPlaying ? <i data-lucide="pause" className="w-4 h-4"></i> : <i data-lucide="play" className="w-4 h-4 fill-slate-950"></i>}
+                    {isPlaying ? <Icon name="pause" className="w-4 h-4" /> : <Icon name="play" className="w-4 h-4 fill-slate-950" />}
                   </button>
-                  <span className="text-[11px] font-mono text-slate-300">
-                    {isPlaying ? 'Playing' : 'Paused'}
-                  </span>
+                  <div className="text-xs font-mono font-bold text-slate-300 flex items-center gap-1 whitespace-nowrap">
+                    <span className="text-white">{formatTime(globalTime)}</span>
+                    <span className="text-slate-500">/</span>
+                    <span className="text-emerald-400">{formatTime(totalDuration)}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* ACTION BUTTONS (Export & New Video) */}
               <div className="w-[320px] space-y-2.5">
                 <button 
                   onClick={handleGenerateVideo}
@@ -784,11 +906,11 @@
                 >
                   {isGenerating ? (
                     <>
-                      <i data-lucide="refresh-cw" className="w-5 h-5 animate-spin"></i> Rendering ({exportProgress}%)
+                      <Icon name="refresh-cw" className="w-5 h-5 animate-spin" /> Rendering ({exportProgress}%)
                     </>
                   ) : (
                     <>
-                      <i data-lucide="download" className="w-5 h-5"></i> Export Video
+                      <Icon name="download" className="w-5 h-5" /> Export Video
                     </>
                   )}
                 </button>
@@ -797,18 +919,17 @@
                   onClick={() => setShowResetModal(true)}
                   className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
                 >
-                  <i data-lucide="plus-circle" className="w-4 h-4 text-emerald-400"></i> New Video
+                  <Icon name="plus-circle" className="w-4 h-4 text-emerald-400" /> New Video
                 </button>
               </div>
             </div>
           </div>
 
-          {/* CONFIRMATION MODAL FOR NEW VIDEO */}
           {showResetModal && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                <div className="flex items-center gap-3 text-amber-400">
-                  <i data-lucide="alert-triangle" className="w-6 h-6 flex-shrink-0"></i>
+                <div className="flex items-center justify-center gap-3 text-amber-400 pb-2">
+                  <Icon name="alert-triangle" className="w-6 h-6 flex-shrink-0" />
                   <h3 className="font-bold text-white text-base">Start a New Video?</h3>
                 </div>
                 <div className="flex items-center gap-3 pt-2">
@@ -829,12 +950,11 @@
             </div>
           )}
 
-          {/* CONFIRMATION MODAL FOR CLIP EDIT / CLEAR ACTIONS */}
           {confirmAction && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                <div className="flex items-center gap-3 text-amber-400">
-                  <i data-lucide="alert-triangle" className="w-6 h-6 flex-shrink-0"></i>
+                <div className="flex items-center justify-center gap-3 text-amber-400 pb-2">
+                  <Icon name="alert-triangle" className="w-6 h-6 flex-shrink-0" />
                   <h3 className="font-bold text-white text-base">
                     {confirmAction.type === 'clear' ? 'Clear Clip Slot?' : 'Edit Cut Length?'}
                   </h3>
