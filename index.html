@@ -15,22 +15,57 @@
   <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- Option A: MP4 Muxer Library -->
+  <script src="https://unpkg.com/mp4-muxer/build/mp4-muxer.js"></script>
+
   <style>
-    /* Solid black outline using exact text-shadows, no webkit stroke to prevent filled 'a' and 'e' counters, no blurry dropshadow */
+    /* Fixed precise outline text styles */
     .rank-number-text {
       font-style: italic;
       font-weight: 900;
       text-shadow: 
         -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
-        -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000;
+        -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+        3px 3px 6px rgba(0,0,0,0.8);
     }
 
     .clip-title-text {
       color: #ffffff;
       font-weight: 900;
       text-shadow: 
-        -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000,
-        -1.5px 0 0 #000, 1.5px 0 0 #000, 0 -1.5px 0 #000, 0 1.5px 0 #000;
+        -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000,
+        -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000,
+        2px 2px 4px rgba(0,0,0,0.9);
+    }
+
+    .dual-range-input {
+      pointer-events: none;
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+    
+    .dual-range-input::-webkit-slider-thumb {
+      pointer-events: auto;
+      width: 20px;
+      height: 32px;
+      border-radius: 6px;
+      background: #10b981;
+      border: 3px solid #ffffff;
+      cursor: ew-resize;
+      -webkit-appearance: none;
+      box-shadow: 0 0 8px rgba(0,0,0,0.6);
+    }
+    
+    .dual-range-input::-moz-range-thumb {
+      pointer-events: auto;
+      width: 20px;
+      height: 32px;
+      border-radius: 6px;
+      background: #10b981;
+      border: 3px solid #ffffff;
+      cursor: ew-resize;
+      box-shadow: 0 0 8px rgba(0,0,0,0.6);
     }
   </style>
 </head>
@@ -94,7 +129,6 @@
       
       const pendingSeekRef = useRef(null);
       const videoRefs = useRef([]); 
-      const exportAudioNodesRef = useRef([]);
 
       const [isGenerating, setIsGenerating] = useState(false);
       const [exportProgress, setExportProgress] = useState(0);
@@ -108,6 +142,7 @@
       const validClipsInfo = playbackOrder.map(id => clips.find(c => c.id === id)).filter(c => c && c.url);
       const totalDuration = validClipsInfo.reduce((acc, c) => acc + Math.max(0, c.endTime - c.startTime), 0);
 
+      // Handle Preview Player Sync
       useEffect(() => {
         if (isGenerating) return;
 
@@ -133,7 +168,6 @@
           }
         });
 
-        // Preload next seamlessly
         const nextIdx = (currentOrderIndex + 1) % playbackOrder.length;
         if (videoRefs.current[nextIdx]) {
           const nextClip = clips.find(x => x.id === playbackOrder[nextIdx]);
@@ -281,11 +315,6 @@
             v.currentTime = 0;
           }
         });
-        // Disconnect audio nodes fully to prevent looping ghost sounds
-        exportAudioNodesRef.current.forEach(node => {
-          try { node.disconnect(); } catch(e){}
-        });
-        exportAudioNodesRef.current = [];
       };
 
       const handleStopReset = () => {
@@ -338,47 +367,45 @@
       };
 
       const handleBulkUpload = (event) => {
-        const files = Array.from(event.target.files).slice(0, 5);
+        const files = Array.from(event.target.files);
         if (files.length === 0) return;
 
-        setClips(prev => {
-          const newClips = [...prev];
-          let fileIndex = 0;
-          
-          for (let i = 0; i < newClips.length && fileIndex < files.length; i++) {
-            if (!newClips[i].url) {
-              const file = files[fileIndex];
-              const fileUrl = URL.createObjectURL(file);
-              const clipId = newClips[i].id;
-              
-              const tempVideo = document.createElement('video');
-              tempVideo.src = fileUrl;
-              
-              tempVideo.onloadedmetadata = () => {
-                const dur = Number(tempVideo.duration.toFixed(1)) || 15;
-                setClips(current => current.map(c => c.id === clipId ? {
-                  ...c, url: fileUrl, source: file.name, status: 'processed', duration: dur, startTime: 0, endTime: dur
-                } : c));
-              };
-              
-              newClips[i] = { ...newClips[i], status: 'processing' };
-              fileIndex++;
-            }
-          }
-          return newClips;
-        });
-      };
+        const emptyClips = clips.filter(c => !c.url);
+        if (emptyClips.length === 0) {
+          alert("All 5 clip slots are already filled!");
+          event.target.value = '';
+          return;
+        }
 
-      const processClip = (id) => {
-        updateClip(id, 'status', 'processing');
-        setTimeout(() => {
-          setClips(prev => prev.map(c => {
-            if (c.id === id) {
-              return { ...c, status: 'processed', duration: 20, startTime: 0, endTime: 20 };
-            }
-            return c;
-          }));
-        }, 1200);
+        const filesToProcess = files.slice(0, emptyClips.length);
+
+        filesToProcess.forEach((file, index) => {
+          const targetClip = emptyClips[index];
+          if (!targetClip) return;
+
+          const fileUrl = URL.createObjectURL(file);
+          const tempVideo = document.createElement('video');
+          tempVideo.src = fileUrl;
+          tempVideo.onloadedmetadata = () => {
+            const dur = Number(tempVideo.duration.toFixed(1)) || 15;
+            setClips(prev => prev.map(c => {
+              if (c.id === targetClip.id) {
+                return {
+                  ...c,
+                  url: fileUrl,
+                  source: file.name,
+                  status: 'processed',
+                  duration: dur,
+                  startTime: 0,
+                  endTime: dur
+                };
+              }
+              return c;
+            }));
+          };
+        });
+
+        event.target.value = '';
       };
 
       const requestClearClip = (id) => setConfirmAction({ type: 'clear', clipId: id });
@@ -391,7 +418,14 @@
           setClips(prev => prev.map(c => {
             if (c.id === confirmAction.clipId) {
               return {
-                ...c, label: '', url: '', source: '', status: 'idle', duration: 15, startTime: 0, endTime: 15
+                ...c,
+                label: '',
+                url: '',
+                source: '',
+                status: 'idle',
+                duration: 15,
+                startTime: 0,
+                endTime: 15
               };
             }
             return c;
@@ -446,7 +480,10 @@
         });
       };
 
-      // FLAWLESS EXPORT SYSTEM (Preloads completely to eliminate loading frames/lags)
+      // ==========================================
+      // OPTION A: ARCHITECTURE IMPLEMENTATION 
+      // OFFLINE MP4 ENCODING ENGINE + AUDIO
+      // ==========================================
       const handleGenerateVideo = async () => {
         const validClips = playbackOrder.map(id => clips.find(c => c.id === id)).filter(c => c && c.url);
         if (validClips.length === 0) {
@@ -454,25 +491,123 @@
           return;
         }
 
+        if (typeof window.VideoEncoder === 'undefined' || typeof window.Mp4Muxer === 'undefined') {
+          alert("Your browser does not support WebCodecs or the MP4 Muxer library was not loaded. Please use a modern Chrome/Edge browser.");
+          return;
+        }
+
         stopAllAudioAndVideo();
         setIsGenerating(true);
-        setExportProgress(2);
-
-        let audioCtx = null;
-        let mediaRecorder = null;
-        const exportVideos = [];
+        setExportProgress(1);
 
         try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 1080;
-          canvas.height = 1920;
-          const ctx = canvas.getContext('2d');
+          const fps = 30;
+          const width = 1080;
+          const height = 1920;
+          const totalSecs = validClips.reduce((acc, c) => acc + (c.endTime - c.startTime), 0);
+          
+          // 1. Setup mp4-muxer target
+          const muxer = new Mp4Muxer.Muxer({
+            target: new Mp4Muxer.ArrayBufferTarget(),
+            video: { codec: 'avc', width, height },
+            audio: { codec: 'aac', numberOfChannels: 2, sampleRate: 44100 },
+            fastStart: 'in-memory'
+          });
 
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const dest = audioCtx.createMediaStreamDestination();
+          // 2. Setup WebCodecs Video Encoder
+          const videoEncoder = new VideoEncoder({
+            output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+            error: e => console.error("VideoEncoder Error:", e)
+          });
+          videoEncoder.configure({
+            codec: 'avc1.640028',
+            width, height,
+            bitrate: 5000000,
+            framerate: fps
+          });
 
-          // PHASE 1: Pre-load and prep all videos perfectly to eliminate buffering lag
+          // 3. Setup WebCodecs Audio Encoder
+          const audioEncoder = new AudioEncoder({
+            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            error: e => console.error("AudioEncoder Error:", e)
+          });
+          audioEncoder.configure({
+            codec: 'mp4a.40.2',
+            numberOfChannels: 2,
+            sampleRate: 44100,
+            bitrate: 128000
+          });
+
+          // 4. Offline Audio Context Rendering
           setExportProgress(5);
+          const sampleRate = 44100;
+          const totalSamples = Math.max(1, Math.floor(totalSecs * sampleRate));
+          const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, totalSamples, sampleRate);
+
+          let currentAudioOffset = 0;
+          for (let i = 0; i < playbackOrder.length; i++) {
+            const clip = clips.find(c => c.id === playbackOrder[i]);
+            if (!clip || !clip.url) continue;
+
+            try {
+              const response = await fetch(clip.url);
+              const arrayBuffer = await response.arrayBuffer();
+              const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
+              
+              const source = offlineCtx.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(offlineCtx.destination);
+              
+              const clipDur = clip.endTime - clip.startTime;
+              source.start(currentAudioOffset, clip.startTime, clipDur);
+              currentAudioOffset += clipDur;
+            } catch (err) {
+              console.warn(`Could not extract audio for clip ${clip.id}. It may be a CORS issue or silent clip.`, err);
+              currentAudioOffset += (clip.endTime - clip.startTime); 
+            }
+          }
+
+          const renderedAudioBuffer = await offlineCtx.startRendering();
+          setExportProgress(15);
+
+          // 5. Chunk AudioData and Feed Audio Encoder
+          const numChannels = renderedAudioBuffer.numberOfChannels;
+          const totalFrames = renderedAudioBuffer.length;
+          const framesPerChunk = sampleRate; 
+          
+          for (let offset = 0; offset < totalFrames; offset += framesPerChunk) {
+            const chunkFrames = Math.min(framesPerChunk, totalFrames - offset);
+            const planarData = new Float32Array(chunkFrames * numChannels);
+            
+            for (let c = 0; c < numChannels; c++) {
+              const channelData = renderedAudioBuffer.getChannelData(c);
+              planarData.set(channelData.subarray(offset, offset + chunkFrames), c * chunkFrames);
+            }
+            
+            const audioData = new AudioData({
+              format: 'f32-planar',
+              sampleRate: sampleRate,
+              numberOfFrames: chunkFrames,
+              numberOfChannels: numChannels,
+              timestamp: (offset / sampleRate) * 1000000,
+              data: planarData
+            });
+            
+            audioEncoder.encode(audioData);
+            audioData.close();
+          }
+          await audioEncoder.flush();
+          setExportProgress(25);
+
+          // 6. Offline Video Canvas Rendering Loop
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d', { alpha: false });
+
+          const totalVideoFrames = Math.floor(totalSecs * fps);
+          let currentFrame = 0;
+
           for (let i = 0; i < playbackOrder.length; i++) {
             const clip = clips.find(c => c.id === playbackOrder[i]);
             if (!clip || !clip.url) continue;
@@ -480,235 +615,161 @@
             const video = document.createElement('video');
             video.crossOrigin = "anonymous";
             video.src = clip.url;
+            video.muted = true;
             video.playsInline = true;
-            video.volume = 1;
 
-            try {
-              const vSource = audioCtx.createMediaElementSource(video);
-              vSource.connect(dest);
-              exportAudioNodesRef.current.push(vSource);
-            } catch (err) {
-              console.warn("CORS Audio warning:", err);
-            }
-
-            // Await full metadata and buffering
-            await new Promise(res => {
-              video.oncanplaythrough = res;
-              video.onerror = res;
-              video.load();
+            await new Promise((res, rej) => {
+              video.onloadeddata = res;
+              video.onerror = rej;
             });
-
-            video.currentTime = clip.startTime;
-            
-            // Wait for exact seek completion
-            await new Promise(res => {
-              video.onseeked = res;
-              setTimeout(res, 300); // Safety fallback
-            });
-
-            exportVideos.push({ clip, video, index: i });
-          }
-
-          setExportProgress(15);
-
-          // Stream Compilation
-          const canvasStream = canvas.captureStream(30);
-          const audioTracks = dest.stream.getAudioTracks();
-          const combinedTracks = [...canvasStream.getVideoTracks()];
-          if (audioTracks.length > 0) combinedTracks.push(audioTracks[0]);
-          
-          const finalStream = new MediaStream(combinedTracks);
-          
-          // Request MP4 natively first, fallback to WebM
-          let mimeType = '';
-          let extension = 'webm';
-          if (MediaRecorder.isTypeSupported('video/mp4')) {
-            mimeType = 'video/mp4';
-            extension = 'mp4';
-          } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
-            mimeType = 'video/webm;codecs=vp9';
-          } else {
-            mimeType = 'video/webm';
-          }
-
-          const recorderOptions = mimeType ? { mimeType } : undefined;
-          mediaRecorder = new MediaRecorder(finalStream, recorderOptions);
-          const chunks = [];
-
-          mediaRecorder.ondataavailable = (e) => {
-            if (e.data.size > 0) chunks.push(e.data);
-          };
-
-          const recordingPromise = new Promise((resolve, reject) => {
-            mediaRecorder.onstop = () => {
-              try {
-                const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `Luced_AI_Ranked_Video.${extension}`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                resolve();
-              } catch (e) {
-                reject(e);
-              }
-            };
-            mediaRecorder.onerror = (e) => reject(e);
-          });
-
-          mediaRecorder.start();
-
-          let totalSecs = validClips.reduce((acc, c) => acc + (c.endTime - c.startTime), 0);
-          let renderedSecs = 0;
-
-          // PHASE 2: Execution (Sequential Render)
-          for (let vData of exportVideos) {
-            const { clip, video, index } = vData;
-
-            setCurrentOrderIndex(index);
-            await video.play().catch(e => console.warn(e));
 
             const clipDuration = clip.endTime - clip.startTime;
+            const clipFrames = Math.floor(clipDuration * fps);
 
-            await new Promise((resolveClip) => {
-              const renderFrame = () => {
-                // Exact time measurement tracking guarantees no lag issues
-                if (video.currentTime >= clip.endTime || video.ended || video.paused) {
-                  video.pause();
-                  video.removeAttribute('src');
-                  video.load();
-                  resolveClip();
-                  return;
+            for (let f = 0; f < clipFrames; f++) {
+              const t = clip.startTime + (f / fps);
+              video.currentTime = t;
+              
+              await new Promise(res => {
+                let timeout = setTimeout(res, 500); 
+                video.onseeked = () => { clearTimeout(timeout); res(); };
+              });
+
+              // DRAW BACKGROUND / CROPPED VIDEO
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(0, 0, width, height);
+
+              const vWidth = video.videoWidth || width;
+              const vHeight = video.videoHeight || height;
+              if (vWidth > 0 && vHeight > 0) {
+                const vAspect = vWidth / vHeight;
+                const targetAspect = width / height;
+                let sx, sy, sWidth, sHeight;
+                if (vAspect > targetAspect) {
+                  sHeight = vHeight;
+                  sWidth = vHeight * targetAspect;
+                  sx = (vWidth - sWidth) / 2;
+                  sy = 0;
+                } else {
+                  sWidth = vWidth;
+                  sHeight = vWidth / targetAspect;
+                  sx = 0;
+                  sy = (vHeight - sHeight) / 2;
                 }
+                ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, width, height);
+              }
 
-                // 1. Draw Cropped Video
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, 1080, 1920);
+              // DRAW TOP TITLE BOX
+              ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+              ctx.fillRect(0, 0, width, 260);
 
-                const vWidth = video.videoWidth || 1080;
-                const vHeight = video.videoHeight || 1920;
-                if (vWidth > 0 && vHeight > 0) {
-                  const vAspect = vWidth / vHeight;
-                  const targetAspect = 1080 / 1920;
-                  let sx, sy, sWidth, sHeight;
-                  if (vAspect > targetAspect) {
-                    sHeight = vHeight;
-                    sWidth = vHeight * targetAspect;
-                    sx = (vWidth - sWidth) / 2;
-                    sy = 0;
-                  } else {
-                    sWidth = vWidth;
-                    sHeight = vWidth / targetAspect;
-                    sx = 0;
-                    sy = (vHeight - sHeight) / 2;
-                  }
-                  ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, 1080, 1920);
-                }
-
-                // 2. Draw Top Box
-                if (mainTitle.trim()) {
-                  const lines = mainTitle.split('\n');
-                  const boxHeight = 70 + (lines.length * 80);
-                  ctx.fillStyle = 'rgba(0, 0, 0, 1)';
-                  ctx.fillRect(0, 0, 1080, boxHeight);
-
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'alphabetic';
-                  ctx.font = '900 68px sans-serif';
-                  let globalIdx = 0;
-                  lines.forEach((line, lineI) => {
-                    const words = line.split(' ');
-                    const totalLineWidth = ctx.measureText(line).width;
-                    let currentX = (1080 - totalLineWidth) / 2;
-                    const yPos = 110 + (lineI * 85);
-
-                    words.forEach((word) => {
-                      const color = wordColors[globalIdx++] || '#FFFFFF';
-                      ctx.fillStyle = color;
-                      ctx.fillText(word, currentX + (ctx.measureText(word).width / 2), yPos);
-                      currentX += ctx.measureText(word + ' ').width;
-                    });
-                  });
-                }
-
-                // 3. Perfect Exact-Coordinates Ranking Render
-                ctx.textAlign = 'left'; 
+              if (mainTitle.trim()) {
+                ctx.textAlign = 'center';
                 ctx.textBaseline = 'alphabetic';
+                ctx.font = '900 68px sans-serif';
+                const lines = mainTitle.split('\n');
+                let globalIdx = 0;
+                lines.forEach((line, lineI) => {
+                  const words = line.split(' ');
+                  const totalLineWidth = ctx.measureText(line.toUpperCase()).width;
+                  let currentX = (width - totalLineWidth) / 2;
+                  const yPos = 110 + (lineI * 85);
 
-                const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32', 4: '#A0A0A0', 5: '#707070' };
-                const startY = 530;
-                
-                [1, 2, 3, 4, 5].map((rankNum) => {
-                  const item = clips.find(c => c.rank === rankNum);
-                  const orderIdx = playbackOrder.findIndex(id => id === item?.id);
-                  const hasBeenShown = orderIdx !== -1 && orderIdx <= index;
-
-                  const yPos = startY + ((rankNum - 1) * 140);
-
-                  // Rank number - unified perfect stroke
-                  ctx.font = 'italic 900 80px sans-serif';
-                  ctx.fillStyle = rankColors[rankNum];
-                  ctx.strokeStyle = '#000000';
-                  ctx.lineWidth = 10; // Thinner stroke prevents filled letter holes
-                  ctx.lineJoin = 'round'; // Smooths sharp corners on outline
-                  ctx.strokeText(`${rankNum}.`, 45, yPos);
-                  ctx.fillText(`${rankNum}.`, 45, yPos);
-
-                  // Clip title - unified perfect stroke
-                  if (hasBeenShown && item?.label) {
-                    ctx.font = '900 52px sans-serif';
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 6; // Thinner stroke for smaller text
-                    ctx.lineJoin = 'round';
-                    ctx.strokeText(item.label.toLowerCase(), 170, yPos);
-                    ctx.fillText(item.label.toLowerCase(), 170, yPos);
-                  }
+                  words.forEach((word) => {
+                    const color = wordColors[globalIdx++] || '#FFFFFF';
+                    ctx.fillStyle = color;
+                    const uppercaseWord = word.toUpperCase();
+                    ctx.fillText(uppercaseWord, currentX + (ctx.measureText(uppercaseWord).width / 2), yPos);
+                    currentX += ctx.measureText(uppercaseWord + ' ').width;
+                  });
                 });
+              }
 
-                // 4. Draw Watermark
-                if (watermarkUser.trim() && watermarkTransparency < 100) {
-                  ctx.save();
-                  ctx.globalAlpha = 1 - (watermarkTransparency / 100);
-                  ctx.font = '900 48px sans-serif';
+              // DRAW RANKS & TITLES
+              ctx.textAlign = 'left'; 
+              ctx.textBaseline = 'alphabetic';
+              const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32', 4: '#A0A0A0', 5: '#707070' };
+              [1, 2, 3, 4, 5].forEach((rankNum) => {
+                const item = clips.find(c => c.rank === rankNum);
+                const orderIdx = playbackOrder.findIndex(id => id === item?.id);
+                const hasBeenShown = orderIdx !== -1 && orderIdx <= i;
+
+                const yPos = 520 + ((rankNum - 1) * 110);
+
+                ctx.font = 'italic 900 80px sans-serif';
+                ctx.fillStyle = rankColors[rankNum];
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 10;
+                ctx.lineJoin = 'round';
+                ctx.strokeText(`${rankNum}.`, 45, yPos);
+                ctx.fillText(`${rankNum}.`, 45, yPos);
+
+                if (hasBeenShown && item?.label) {
+                  ctx.font = '900 52px sans-serif';
                   ctx.fillStyle = '#FFFFFF';
                   ctx.strokeStyle = '#000000';
-                  ctx.lineWidth = 8;
-                  ctx.textAlign = 'right';
-                  ctx.strokeText(`@${watermarkUser.trim()}`, 1020, 1850);
-                  ctx.fillText(`@${watermarkUser.trim()}`, 1020, 1850);
-                  ctx.restore();
+                  ctx.lineWidth = 6;
+                  ctx.lineJoin = 'round';
+                  // Keep user-entered casing for clip names on export
+                  ctx.strokeText(item.label, 170, yPos);
+                  ctx.fillText(item.label, 170, yPos);
                 }
+              });
 
-                // Accurate Progress Tracker
-                const currentClipElapsed = video.currentTime - clip.startTime;
-                const previousClipsDuration = validClips.slice(0, validClips.findIndex(c => c.id === clip.id)).reduce((acc, c) => acc + (c.endTime - c.startTime), 0);
-                renderedSecs = previousClipsDuration + currentClipElapsed;
-                setExportProgress(Math.max(15, Math.min(99, Math.round((renderedSecs / totalSecs) * 100))));
+              // DRAW WATERMARK
+              if (watermarkUser.trim() && watermarkTransparency < 100) {
+                ctx.save();
+                ctx.globalAlpha = 1 - (watermarkTransparency / 100);
+                ctx.font = '900 48px sans-serif';
+                ctx.fillStyle = '#FFFFFF';
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 6;
+                ctx.lineJoin = 'round';
+                ctx.textAlign = 'right';
+                ctx.strokeText(`@${watermarkUser.trim()}`, 1020, 1850);
+                ctx.fillText(`@${watermarkUser.trim()}`, 1020, 1850);
+                ctx.restore();
+              }
 
-                requestAnimationFrame(renderFrame);
-              };
-              renderFrame();
-            });
+              // 7. Extract ImageBitmap and feed Video Encoder
+              const bitmap = await createImageBitmap(canvas);
+              const timestampMicros = currentFrame * 1000000 / fps;
+              const videoFrame = new VideoFrame(bitmap, { timestamp: timestampMicros });
+              
+              videoEncoder.encode(videoFrame);
+              
+              videoFrame.close();
+              bitmap.close();
+
+              currentFrame++;
+              setExportProgress(25 + Math.floor((currentFrame / totalVideoFrames) * 74));
+            }
           }
 
-          if (mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-          }
-          await recordingPromise; 
+          // 8. Finalize Streams
+          await videoEncoder.flush();
+          muxer.finalize();
+          
+          // 9. Download the MP4
+          const { buffer } = muxer.target;
+          const blob = new Blob([buffer], { type: 'video/mp4' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = "Luced_AI_Ranked_Video.mp4";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+            
+          setExportProgress(100);
 
         } catch (err) {
-          console.error("Recording Export Failed", err);
-          alert("Export processing failed. Please try again.");
+          console.error("Option A Export Engine Failed:", err);
+          alert("Export engine failed. See console for details.");
         } finally {
-          if (audioCtx) audioCtx.close().catch(()=>{});
-          stopAllAudioAndVideo(); 
-          setIsGenerating(false);
-          setExportProgress(100);
+          setTimeout(() => setIsGenerating(false), 1500);
         }
       };
 
@@ -744,8 +805,8 @@
                 }
 
                 return (
-                  <span key={wordIdx} style={{ color: wordColor }} className="font-extrabold inline-block mr-1.5">
-                    {word}{' '}
+                  <span key={wordIdx} style={{ color: wordColor }} className="font-extrabold inline-block mr-1.5 uppercase">
+                    {word}
                   </span>
                 );
               })}
@@ -828,10 +889,24 @@
                 </div>
               </div>
 
-              {/* BOX 2: CLIP & BULK UPLOAD */}
+              {/* BOX 2: CLIP */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider border-b border-slate-800 pb-2">
-                  <Icon name="video" className="w-5 h-5" /> Clip
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase tracking-wider">
+                    <Icon name="video" className="w-5 h-5" /> Clip
+                  </div>
+
+                  {/* BULK UPLOAD BUTTON */}
+                  <label className="px-3 py-1.5 bg-emerald-950 text-emerald-400 hover:bg-emerald-900 border border-emerald-800/50 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5 transition">
+                    <Icon name="upload" className="w-3.5 h-3.5" /> Bulk Upload (Up to 5)
+                    <input 
+                      type="file" 
+                      accept="video/*" 
+                      multiple 
+                      onChange={handleBulkUpload} 
+                      className="hidden" 
+                    />
+                  </label>
                 </div>
 
                 <div className="space-y-4">
@@ -891,7 +966,7 @@
                           )}
                         </div>
 
-                        {/* Always-visible Numeric Cuts */}
+                        {/* Numeric Start/End Cuts */}
                         {hasClip && (
                           <div className="pt-2 border-t border-slate-900 grid grid-cols-2 md:grid-cols-3 gap-3 items-center bg-slate-900/60 p-2.5 rounded-lg">
                             <div className="flex items-center gap-2">
@@ -921,27 +996,13 @@
                             </div>
 
                             <div className="col-span-2 md:col-span-1 text-right text-[11px] font-semibold text-slate-400">
-                              Duration: <span className="text-white font-bold">{Math.max(0, clip.endTime - clip.startTime).toFixed(1)}s</span>
+                              Duration: <span className="text-white font-bold">{(clip.endTime - clip.startTime).toFixed(1)}s</span>
                             </div>
                           </div>
                         )}
                       </div>
                     );
                   })}
-                </div>
-
-                {/* Bulk Upload Button */}
-                <div className="pt-2">
-                  <label className="w-full py-3 bg-slate-900 border border-slate-800 border-dashed hover:border-emerald-500 hover:bg-slate-800 text-slate-400 font-bold text-sm rounded-xl flex items-center justify-center gap-2 transition cursor-pointer">
-                    <Icon name="upload" className="w-4 h-4 text-emerald-400" /> Bulk Upload Clips (Max 5)
-                    <input 
-                      type="file" 
-                      multiple 
-                      accept="video/*" 
-                      onChange={handleBulkUpload} 
-                      className="hidden" 
-                    />
-                  </label>
                 </div>
               </div>
 
@@ -1102,7 +1163,7 @@
                     </h2>
                   </div>
 
-                  {/* OVERLAY 2: Persistent Ranks (Clean Left-Aligned Vector CSS) */}
+                  {/* OVERLAY 2: Persistent Ranks */}
                   <div className="absolute top-[28%] left-3 z-20 flex flex-col gap-3 pointer-events-none">
                     {[1, 2, 3, 4, 5].map((rankNum) => {
                       const item = clips.find(c => c.rank === rankNum);
@@ -1116,13 +1177,13 @@
                         <div key={rankNum} className="flex items-center gap-3 h-8">
                           <span 
                             style={{ color: rankColors[rankNum] }} 
-                            className="rank-number-text text-xl"
+                            className="rank-number-text text-xl tracking-tighter"
                           >
                             {rankNum}.
                           </span>
                           
                           {hasBeenShown && item?.label && (
-                            <span className="clip-title-text text-sm lowercase">
+                            <span className="clip-title-text text-sm tracking-wide">
                               {item.label}
                             </span>
                           )}
@@ -1232,11 +1293,11 @@
                   >
                     {isGenerating ? (
                       <>
-                        <Icon name="refresh-cw" className="w-5 h-5 animate-spin" /> Recording ({exportProgress}%)
+                        <Icon name="refresh-cw" className="w-5 h-5 animate-spin" /> Rendering MP4 ({exportProgress}%)
                       </>
                     ) : (
                       <>
-                        <Icon name="download" className="w-5 h-5" /> Export Video
+                        <Icon name="download" className="w-5 h-5" /> Export MP4 Video
                       </>
                     )}
                   </button>
@@ -1278,13 +1339,13 @@
             </div>
           )}
 
-          {/* CONFIRMATION MODAL FOR CLEARING CLIP */}
+          {/* CONFIRMATION MODAL FOR CLEARING CLIP LINK */}
           {confirmAction && (
             <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95Duration-150">
                 <div className="flex items-center justify-center gap-3 text-amber-400 pb-2">
                   <Icon name="alert-triangle" className="w-6 h-6 flex-shrink-0" />
-                  <h3 className="font-bold text-white text-base">Clear Clip Slot?</h3>
+                  <h3 className="font-bold text-base text-white">Clear Clip Slot?</h3>
                 </div>
                 <div className="flex items-center gap-3 pt-2">
                   <button 
@@ -1297,7 +1358,7 @@
                     onClick={handleConfirmAction}
                     className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl transition shadow-lg shadow-emerald-950/50"
                   >
-                    Confirm
+                    Confirm`
                   </button>
                 </div>
               </div>
